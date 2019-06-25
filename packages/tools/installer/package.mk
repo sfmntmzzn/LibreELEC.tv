@@ -6,7 +6,7 @@ PKG_VERSION="1"
 PKG_LICENSE="GPL"
 PKG_SITE="http://libreelec.tv/"
 PKG_URL=""
-PKG_DEPENDS_TARGET="toolchain busybox newt parted e2fsprogs syslinux grub"
+PKG_DEPENDS_TARGET="toolchain toybox newt parted e2fsprogs syslinux grub"
 PKG_LONGDESC="LibreELEC.tv Install manager to install the system on any disk"
 PKG_TOOLCHAIN="manual"
 
