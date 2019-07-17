@@ -43,4 +43,5 @@ while [ : ]; do
   fi
 
   echo
+  break
 done
