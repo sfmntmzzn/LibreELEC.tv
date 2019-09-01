@@ -5,7 +5,7 @@
 PKG_NAME="squashfs-tools"
 PKG_VERSION="4.4"
 PKG_SHA256="a7fa4845e9908523c38d4acf92f8a41fdfcd19def41bd5090d7ad767a6dc75c3"
-PKG_LICENSE="GPL"
+PKG_LICENSE="GPL2"
 PKG_SITE="https://github.com/plougher/squashfs-tools"
 PKG_URL="https://github.com/plougher/squashfs-tools/archive/${PKG_VERSION}.tar.gz"
 PKG_DEPENDS_HOST="ccache:host zlib:host lzo:host xz:host zstd:host"
