@@ -1,0 +1,117 @@
+# https://github.com/LibreELEC/actions/blob/main/.github/workflows/make-image.yml
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile:
+        type: string
+        required: false
+        default: focal
+      project:
+        type: string
+        required: true
+      arch:
+        type: string
+        required: true
+      device:
+        type: string
+        required: true
+      distro:
+        type: string
+        required: false
+
+#concurrency:
+#  group: ${{ inputs.project }}-${{ inputs.arch }}-${{ inputs.device }}
+#  cancel-in-progress: false
+
+jobs:
+  build_image:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo THREADCOUNT=${THREADCOUNT:-$(nproc)}
+
+      # Github hosted runner come with around 28 GB of free space. That is
+      # unfortunately not enaugh to build the full toolchain. This action
+      # tries to increase the amount of free space.
+      - run: |
+          # Free up some disk space
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      #- run: |
+      #    sudo apt update
+      #    sudo apt upgrade
+      #    sudo apt install gcc make git unzip wget xz-utils bc gperf zip g++ xfonts-utils xsltproc openjdk-11-jre-headless
+      #    sudo apt install libxml-parser-perl libparse-yapp-perl lzop patchutils
+
+      - run: |
+          # Build docker image
+          sed -i -e "s/RUN adduser/RUN adduser --uid $(id -u)/" tools/docker/${{ inputs.dockerfile }}/Dockerfile
+          docker build --pull -t gh-${{ github.run_id }} tools/docker/${{ inputs.dockerfile }}
+
+      #- uses: actions/cache@v3
+      #  with:
+      #    path: ${{ github.workspace }}/sources
+      #    key: sources-${{ github.run_id }}
+      #    restore-keys: sources
+
+      #- run: make clean && make image
+
+      - run: |
+          # Build distro image
+          docker run --rm \
+            -v `pwd`:/build -w /build \
+            -e PROJECT=${{ inputs.project }} \
+            -e ARCH=${{ inputs.arch }} \
+            -e DEVICE=${{ inputs.device }} \
+            -e DISTRO=${{ inputs.distro }} \
+            -e ONELOG=no -e LOGCOMBINE=fail \
+            -e AUTOREMOVE=yes \
+            -e CCACHE_DISABLE=1 \
+            gh-${{ github.run_id }} \
+            make image
+        #continue-on-error: true
+
+      - run: |
+          # Delete docker image
+          docker image rm -f gh-${{ github.run_id }}
+
+      - id: buildfilename
+        run: |
+          # Get file name
+          echo "::set-output name=filename::$(cat build.*/BUILD_FILENAME)"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: target
+          path: |
+            ${{ github.workspace }}/target/${{ steps.buildfilename.outputs.filename }}*.img.gz
+            ${{ github.workspace }}/target/${{ steps.buildfilename.outputs.filename }}*.img.gz.sha256
+
+      - run: |
+          # Compare file sizes
+          pushd ${{ github.workspace }}/target
+          case "${{ inputs.project }}-${{ inputs.arch }}-${{ inputs.device }}" in
+            Generic-x86_64-)
+              RELEASE_NAME=LibreELEC-Generic.x86_64-10.0.2.img.gz ;;
+            Rockchip-arm-RK3288)
+              RELEASE_NAME=LibreELEC-RK3288.arm-10.0.2-tinker.img.gz ;;
+            *)
+              popd; exit ;;
+          esac
+          wget -nv https://releases.libreelec.tv/$RELEASE_NAME
+          RELEASE_SIZE=`du -k $RELEASE_NAME | cut -f1`
+          TARGET_SIZE=`du -k ${{ steps.buildfilename.outputs.filename }}*.img.gz | head -1 | cut -f1`
+          popd
+          echo
+          echo "Last upstream release size:"
+          echo "  $RELEASE_SIZE kb"
+          echo
+          echo "Our size:"
+          echo "  $TARGET_SIZE kb  ($(echo "scale=1;-100+100*$TARGET_SIZE/$RELEASE_SIZE"|bc)%)"
+          echo

@@ -1,0 +1,19 @@
+on: push
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - DISTRO: SFMLibreELEC
+            PROJECT: Generic
+            ARCH: x86_64
+          - DISTRO: SFMLibreELEC
+            PROJECT: Rockchip
+            ARCH: arm
+            DEVICE: RK3288
+    uses: ./.github/workflows/make-image.yml
+    with:
+      project: ${{ matrix.PROJECT }}
+      arch: ${{ matrix.ARCH }}
+      device: ${{ matrix.DEVICE }}
+      distro: ${{ matrix.DISTRO }}

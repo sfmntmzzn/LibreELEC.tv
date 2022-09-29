@@ -1,0 +1,45 @@
+# This file is a template, and might need editing before it works on your project.
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Docker.gitlab-ci.yml
+
+# Build a Docker image with CI/CD and push to the GitLab registry.
+# Docker-in-Docker documentation: https://docs.gitlab.com/ee/ci/docker/using_docker_build.html
+#
+# This template uses one generic job with conditional builds
+# for the default branch and all other (MR) branches.
+
+variables:
+  dockerfile: 'focal'
+  distro: 'SFMLibreELEC'
+  project: 'Generic'
+  arch: 'x86_64'
+  device: ''
+
+build:
+  # Use the official docker image.
+  stage: build
+  services:
+    - docker:dind
+  script:
+    - |
+      # Build docker image
+      sed -i -e "s/RUN adduser/RUN adduser --uid $(id -u)/" tools/docker/$dockerfile/Dockerfile
+      docker build --pull -t "$CI_REGISTRY_IMAGE${tag}" tools/docker/$dockerfile
+    - |
+      # Build distro image
+      docker run --rm \
+        -v `pwd`:/build -w /build \
+        -e DISTRO=$distro \
+        -e PROJECT=$project \
+        -e ARCH=$arch \
+        -e DEVICE=$device \
+        -e ONELOG=no -e LOGCOMBINE=fail \
+        -e AUTOREMOVE=yes \
+        -e CCACHE_DISABLE=1 \
+        "$CI_REGISTRY_IMAGE${tag}" \
+        make image
+    - |
+      # Delete docker image
+      docker image rm -f "$CI_REGISTRY_IMAGE${tag}"
